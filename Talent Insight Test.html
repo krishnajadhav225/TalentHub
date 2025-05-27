@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>People Evaluation Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            /* Adjusted max-width for a wider, 16:9-like feel for the report */
+            max-width: 1200px; /* Increased width */
+            width: 100%;
+            background-color: #ffffff;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            padding: 30px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        .login-container, .test-container, .scorecard {
+            display: none; /* Hidden by default, managed by JS */
+        }
+        .question-block {
+            background-color: #f9fafb;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #e5e7eb;
+        }
+        .option-label {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            margin-bottom: 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+        .option-label:hover {
+            background-color: #e0f2fe;
+            border-color: #3b82f6;
+        }
+        .option-label input[type="radio"] {
+            margin-right: 12px;
+            accent-color: #3b82f6;
+        }
+        .submit-button, .login-button, .retake-button {
+            background-color: #3b82f6;
+            color: white;
+            font-weight: bold;
+            padding: 12px 24px;
+            border-radius: 9999px;
+            transition: background-color 0.2s ease-in-out;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            max-width: 200px;
+            margin: 20px auto 0 auto;
+            display: block;
+        }
+        .submit-button:hover, .login-button:hover, .retake-button:hover {
+            background-color: #2563eb;
+        }
+        .error-message {
+            color: #dc2626;
+            font-weight: 600;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .score-card-item {
+            background-color: #f0fdf4;
+            border: 1px solid #a7f3d0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            text-align: center;
+            color: #059669;
+            font-weight: bold;
+        }
+        .chart-container {
+            /* Adjusted for side-by-side layout */
+            width: 100%; /* Full width on small screens */
+            max-height: 400px; /* Limit height for charts */
+            padding: 20px;
+            background-color: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            box-sizing: border-box;
+        }
+        /* Flexbox for charts on medium and larger screens */
+        @media (min-width: 768px) {
+            .charts-row {
+                display: flex;
+                flex-direction: row; /* Side-by-side */
+                gap: 20px; /* Space between charts */
+                margin-top: 30px;
+            }
+            .chart-container {
+                width: calc(50% - 10px); /* Roughly half width minus gap */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-4xl font-extrabold text-gray-900 mb-6 text-center">People Evaluation Tool</h1>
+        <p class="text-gray-700 text-lg mb-8 text-center">
+            Welcome! This assessment evaluates key leadership competencies through scenario-based questions.
+        </p>
+
+        <div id="login-container" class="login-container block">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Login</h2>
+            <div class="mb-4">
+                <label for="username" class="block text-gray-700 text-sm font-bold mb-2">Username:</label>
+                <input type="text" id="username" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Enter username">
+            </div>
+            <div class="mb-6">
+                <label for="password" class="block text-gray-700 text-sm font-bold mb-2">Password:</label>
+                <input type="password" id="password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline" placeholder="Enter password">
+            </div>
+            <div id="login-error" class="error-message hidden mb-4">Invalid username or password.</div>
+            <button id="login-button" class="login-button">Login</button>
+        </div>
+
+        <div id="test-container" class="test-container">
+            <p class="text-gray-700 text-lg mb-8 text-center">
+                Read each scenario carefully and select the option that best reflects the most appropriate and effective response.
+            </p>
+            <div id="questions-area"></div>
+
+            <div id="test-error-message" class="error-message hidden">
+                Please answer all questions before submitting.
+            </div>
+
+            <button id="submit-button" class="submit-button">Submit Test</button>
+        </div>
+
+        <div id="scorecard" class="scorecard">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Your Performance Report</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                <div class="score-card-item">
+                    Overall Score: <span id="final-score" class="text-2xl"></span> / 20
+                </div>
+                <div class="score-card-item">
+                    Percentage Score: <span id="percentage-score" class="text-2xl"></span>%
+                </div>
+            </div>
+
+            <p id="overall-message" class="text-center text-lg font-semibold mb-8"></p>
+
+            <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">Competency Breakdown</h3>
+            <div id="competency-scores" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                </div>
+
+            <div class="charts-row flex flex-col md:flex-row gap-4">
+                <div class="chart-container">
+                    <canvas id="pieChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="barChart"></canvas>
+                </div>
+            </div>
+
+            <button id="retake-button" class="retake-button mt-8">Retake Test</button>
+        </div>
+    </div>
+
+    <script>
+        // Define users for login (in a real app, this would be server-side)
+        const USERS = {
+            "user1": "pass1",
+            "admin": "admin123"
+        };
+
+        // Define competencies and their associated questions, now with initials
+        const COMPETENCIES = [
+            { name: "Conflict Resolution & Mediation", id: "conflictResolution", initials: "CR&M" },
+            { name: "Team Empowerment & Motivation", id: "teamEmpowerment", initials: "TE&M" },
+            { name: "Coaching & Talent Development", id: "coachingTalent", initials: "C&TD" },
+            { name: "Recognition & Appreciation", id: "recognition", initials: "R&A" },
+            { name: "Psychological Safety & Inclusion", id: "psychologicalSafety", initials: "PS&I" },
+            { name: "Accountability & Fairness", id: "accountabilityFairness", initials: "A&F" },
+            { name: "Communication & Transparency", id: "communicationTransparency", initials: "C&T" },
+            { name: "Trust-Building & Integrity", id: "trustBuilding", initials: "TB&I" },
+            { name: "Decision-Making Under Pressure", id: "decisionMaking", initials: "DMUP" },
+            { name: "Change Leadership & Adaptability", id: "changeLeadership", initials: "CL&A" }
+        ];
+
+        // Questions array, with 'A. ', 'B. ', 'C. ', 'D. ' prefixes removed from options
+        const questions = [
+            // 1. Conflict Resolution & Mediation
+            { id: 'q1', competency: "conflictResolution", scenario: "You overhear two key team members having a heated argument in an open office space about the division of tasks on a shared project. Their voices are raised, and it's clear the conflict is escalating.", options: [{ text: "Ignore it; they're adults and should sort out their own disagreements.", score: 0 }, { text: "Send them both an email suggesting they need to be more professional.", score: 0.25 }, { text: "Interrupt them and tell them to stop arguing, but don't offer a path to resolution.", score: 0.50 }, { text: "Pull both team members aside immediately, acknowledge the tension, and offer to facilitate a private discussion to understand their perspectives and find a fair resolution.", score: 1 }] },
+            { id: 'q2', competency: "conflictResolution", scenario: "A long-standing team conflict involves a dispute over shared resources, leading to passive-aggressive behavior and reduced collaboration among several team members.", options: [{ text: "Wait until the conflict impacts a major project before intervening.", score: 0 }, { text: "Suggest they follow the existing (and possibly outdated) resource allocation policy strictly.", score: 0.25 }, { text: "Hold a team meeting and ask everyone to voice their complaints about the resource issue.", score: 0.50 }, { text: "Initiate individual conversations to understand the root causes, then facilitate a structured team discussion to establish clear, mutually agreed-upon guidelines for resource sharing, focusing on fair and collaborative solutions.", score: 1 }] },
+            // 2. Team Empowerment & Motivation
+            { id: 'q3', competency: "teamEmpowerment", scenario: "A high-performing team member expresses hesitation about leading a new, complex project, stating they feel it's beyond their capabilities.", options: [{ text: "Reassign the project to someone else who seems more confident.", score: 0 }, { text: "Tell them they just need to 'push through' and take on the challenge.", score: 0.25 }, { text: "Offer to do most of the challenging parts of the project yourself, allowing them to lead the easier sections.", score: 0.50 }, { text: "Discuss their specific concerns, express confidence in their abilities, provide resources or mentoring support, and empower them to define their approach and make key decisions for the project.", score: 1 }] },
+            { id: 'q4', competency: "teamEmpowerment", scenario: "Your team has been performing well, but you sense a growing reliance on your decisions for even minor issues, slowing down their workflow.", options: [{ text: "Continue making all the decisions to ensure efficiency.", score: 0 }, { text: "Tell them they need to be more independent, but don't provide guidance.", score: 0.25 }, { text: "Implement a new rule that they must try to solve problems for 30 minutes before coming to you.", score: 0.50 }, { text: "Encourage them to propose solutions first, provide frameworks for decision-making, and delegate appropriate decision-making authority, guiding them through the process rather than giving direct answers.", score: 1 }] },
+            // 3. Coaching & Talent Development
+            { id: 'q5', competency: "coachingTalent", scenario: "A junior team member consistently struggles with a specific technical skill crucial for their role, despite attending basic training.", options: [{ text: "Mark them down in their performance review and suggest they consider another role.", score: 0 }, { text: "Send them to another general training course on the same topic.", score: 0.25 }, { text: "Ask a senior team member to informally mentor them, without setting clear objectives.", score: 0.50 }, { text: "Conduct a personalized assessment to identify the specific gaps, provide targeted feedback, and co-create a development plan including tailored resources, practice opportunities, and regular check-ins.", score: 1 }] },
+            { id: 'q6', competency: "coachingTalent", scenario: "A top performer on your team expresses interest in taking on more strategic responsibilities, but currently lacks experience in high-level planning.", options: [{ text: "Tell them it's too early for such responsibilities and they need to focus on their current tasks.", score: 0 }, { text: "Delegate a complex strategic task to them without much guidance, to see if they sink or swim.", score: 0.25 }, { text: "Advise them to take external courses on strategic planning, but don't offer company support.", score: 0.50 }, { text: "Discuss their career aspirations, identify relevant stretch assignments or projects that can expose them to strategic thinking, and offer mentorship and regular feedback on their progress in these new areas.", score: 1 }] },
+            // 4. Recognition & Appreciation
+            { id: 'q7', competency: "recognition", scenario: "Your team has just delivered a major project under immense pressure, exceeding client expectations.", options: [{ text: "Simply move on to the next project, assuming the team knows they did well.", score: 0 }, { text: "Send a generic 'good job' email to the team.", score: 0.25 }, { text: "Announce their success in a company-wide meeting without mentioning individual contributions.", score: 0.50 }, { text: "Organize a team celebration (e.g., lunch, outing), highlight specific individual contributions to the success, and provide personalized public and private recognition for their efforts.", score: 1 }] },
+            { id: 'q8', competency: "recognition", scenario: "You notice a quiet, consistent contributor who often goes above and beyond but rarely seeks attention or praise for their efforts.", options: [{ text: "Assume they prefer to be unnoticed and don't recognize them.", score: 0 }, { text: "Give them a public shout-out, even if they seem uncomfortable with it.", score: 0.25 }, { text: "Give them a small, informal thank you during a one-on-one meeting.", score: 0.50 }, { text: "Observe their preferred appreciation style, then offer tailored, meaningful recognition that acknowledges their specific contributions and impact, whether it's a private word of thanks, a personalized award, or a development opportunity.", score: 1 }] },
+            // 5. Psychological Safety & Inclusion
+            { id: 'q9', competency: "psychologicalSafety", scenario: "During a brainstorming session, a new team member proposes an idea that is significantly different from established norms, and a senior team member immediately dismisses it with a sarcastic comment.", options: [{ text: "Let the comment slide to avoid creating further tension.", score: 0 }, { text: "Tell the senior team member to 'be nicer' but don't address the core issue.", score: 0.25 }, { text: "Privately tell the new team member that their idea was interesting, but the senior member is just 'like that.'", score: 0.50 }, { text: "Intervene immediately and politely, acknowledge the new team member's idea, gently redirect the senior team member to focus on constructive feedback, and reinforce the importance of welcoming all perspectives.", score: 1 }] },
+            { id: 'q10', competency: "psychologicalSafety", scenario: "A team member comes to you with sensitive feedback about feeling excluded from informal team discussions, even though they are performing well.", options: [{ text: "Tell them they are being too sensitive and need to be more proactive in joining conversations.", score: 0 }, { text: "Send a general email reminding the team to be inclusive, without addressing the specific issue.", score: 0.25 }, { text: "Privately tell the team member that you will 'keep an eye on it' without a clear plan.", score: 0.50 }, { text: "Listen empathetically to their concerns, acknowledge their feelings, and then take proactive steps to foster inclusion (e.g., facilitate inclusive team-building activities, address unconscious biases, ensure equitable participation opportunities).", score: 1 }] },
+            // 6. Accountability & Fairness
+            { id: 'q11', competency: "accountabilityFairness", scenario: "A high-performing team member consistently misses minor deadlines, impacting downstream processes, but they are otherwise a strong contributor.", options: [{ text: "Ignore the missed deadlines because they are a strong performer.", score: 0 }, { text: "Publicly call them out on their missed deadlines during a team meeting.", score: 0.25 }, { text: "Privately ask them to improve, without setting clear expectations or consequences.", score: 0.50 }, { text: "Have a direct, private conversation about the impact of the missed deadlines, understand any underlying reasons, and collaboratively establish clear expectations and a plan for consistent adherence, offering support while ensuring accountability.", score: 1 }] },
+            { id: 'q12', competency: "accountabilityFairness", scenario: "You need to make a decision about who gets assigned to a highly sought-after new project. Two team members have comparable skills, but one is a personal friend.", options: [{ text: "Assign it to your personal friend; it's a perk of leadership.", score: 0 }, { text: "Assign it to the other person to avoid any appearance of favoritism, even if your friend might be slightly better suited.", score: 0.25 }, { text: "Flip a coin to decide, as their skills are comparable.", score: 0.50 }, { text: "Objectively assess both candidates based on documented performance, relevant skills, and developmental needs, and transparently communicate the rationale for the final decision, ensuring fairness and impartiality.", score: 1 }] },
+            // 7. Communication & Transparency
+            { id: 'q13', competency: "communicationTransparency", scenario: "The company is undergoing a significant strategic shift, and there's a lot of uncertainty and speculation among the team.", options: [{ text: "Withhold all information until all details are finalized to avoid confusion.", score: 0 }, { text: "Share vague, high-level statements that don't address the team's specific concerns.", score: 0.25 }, { text: "Share all information you know, even if some of it is speculative or unconfirmed.", score: 0.50 }, { text: "Communicate clearly and consistently what is known, acknowledge the uncertainty, explain the rationale behind the changes, and create open channels for questions and feedback, committing to providing updates as they become available.", score: 1 }] },
+            { id: 'q14', competency: "communicationTransparency", scenario: "During a one-on-one meeting, a team member expresses frustration about a perceived lack of clear direction from leadership.", options: [{ text: "Deflect the criticism and tell them to focus on their tasks.", score: 0 }, { text: "Agree with them and complain about leadership yourself.", score: 0.25 }, { text: "Offer a brief explanation, but don't explore their specific concerns further.", score: 0.50 }, { text: "Listen actively and empathetically to understand their specific frustrations, clarify existing communication, and commit to improving communication flow by sharing relevant information or escalating their concerns to senior leadership if appropriate.", score: 1 }] },
+            // 8. Trust-Building & Integrity
+            { id: 'q15', competency: "trustBuilding", scenario: "You committed to securing a new piece of software for your team by a specific date, but due to unforeseen budget cuts, you cannot fulfill the promise.", options: [{ text: "Ignore the commitment and hope the team forgets about it.", score: 0 }, { text: "Tell the team the software is delayed, but don't explain why.", score: 0.25 }, { text: "Blame the budget department for the broken promise.", score: 0.50 }, { text: "Immediately and transparently communicate the change in plans, explain the reasons (e.g., budget cuts), apologize for not being able to fulfill the commitment, and discuss alternative solutions or timelines.", score: 1 }] },
+            { id: 'q16', competency: "trustBuilding", scenario: "You discover a minor but unethical practice being performed by a long-serving, respected team member that doesn't directly impact results but violates company policy.", options: [{ text: "Overlook it, as they are a valuable team member and it's a minor issue.", score: 0 }, { text: "Send out a general email reminding everyone about company policy, without addressing the individual.", score: 0.25 }, { text: "Inform HR without first speaking to the team member.", score: 0.50 }, { text: "Address the issue privately and directly with the team member, explain the policy violation and its implications, and establish clear expectations for adherence to ethical standards, demonstrating consistency and integrity in upholding company values.", score: 1 }] },
+            // 9. Decision-Making Under Pressure
+            { id: 'q17', competency: "decisionMaking", scenario: "A critical system outage occurs on a Friday afternoon, impacting customer service, and you need to decide between two costly and complex recovery options.", options: [{ text: "Postpone the decision until Monday morning to ensure you have all information.", score: 0 }, { text: "Pick the cheaper option to minimize immediate financial impact, without fully assessing long-term risk.", score: 0.25 }, { text: "Involve every team member in a long discussion to reach a consensus, delaying the decision.", score: 0.50 }, { text: "Quickly assess the available data, consult with key subject matter experts, weigh the risks and benefits of each option (considering both business impact and customer experience), make a timely decision, and communicate the rationale and next steps to the relevant stakeholders.", score: 1 }] },
+            { id: 'q18', competency: "decisionMaking", scenario: "Your team is facing a tight deadline, and a major technical obstacle emerges that jeopardizes project completion. You have limited time to decide on a course of action.", options: [{ text: "Ignore the obstacle and hope it resolves itself, or push the team to work harder.", score: 0 }, { text: "Delegate the problem-solving entirely to the most junior team member.", score: 0.25 }, { text: "C. Call an immediate all-hands meeting to panic and discuss worst-case scenarios.", score: 0.50 }, { text: "D. Remain calm, quickly gather essential information about the obstacle, convene a small group of relevant experts, explore viable solutions and their implications (including potential trade-offs), and make a decisive, informed choice, communicating the plan clearly.", score: 1 }] },
+            // 10. Change Leadership & Adaptability
+            { id: 'q19', competency: "changeLeadership", scenario: "Your department is undergoing a significant technological transformation, and some team members are resistant to learning the new system, expressing fear of failure.", options: [{ text: "Tell them they have no choice but to learn the new system or face consequences.", score: 0 }, { text: "Organize mandatory training but don't address their underlying concerns.", score: 0.25 }, { text: "C. Let the most enthusiastic team members try the new system first, and others can follow later.", score: 0.50 }, { text: "D. Acknowledge their concerns and fears, clearly articulate the benefits of the change, provide ample training and support (including mentorship or peer learning), and model a positive, flexible attitude towards adopting the new technology.", score: 1 }] },
+            { id: 'q20', competency: "changeLeadership", scenario: "A crucial project fails due to unforeseen market shifts, leading to disappointment and demotivation within your team.", options: [{ text: "Blame external factors or other departments for the failure and avoid discussing it further.", score: 0 }, { text: "Push the team immediately into the next project, ignoring the emotional impact of the failure.", score: 0.25 }, { text: "C. Hold a post-mortem to assign blame and find who was responsible.", score: 0.50 }, { text: "D. Conduct a constructive debriefing focused on lessons learned rather than blame, acknowledge the team's effort and disappointment, help them understand the external factors, and guide them in identifying how to adapt and improve for future projects, modeling resilience.", score: 1 }] }
+        ];
+
+        // Get DOM elements
+        const loginContainer = document.getElementById('login-container');
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+        const loginButton = document.getElementById('login-button');
+        const loginError = document.getElementById('login-error');
+
+        const testContainer = document.getElementById('test-container');
+        const questionsArea = document.getElementById('questions-area');
+        const submitButton = document.getElementById('submit-button');
+        const testErrorMessage = document.getElementById('test-error-message');
+
+        const scorecard = document.getElementById('scorecard');
+        const finalScoreSpan = document.getElementById('final-score');
+        const percentageScoreSpan = document.getElementById('percentage-score');
+        const overallMessage = document.getElementById('overall-message');
+        const competencyScoresDiv = document.getElementById('competency-scores');
+        const retakeButton = document.getElementById('retake-button');
+
+        let barChartInstance = null;
+        let pieChartInstance = null;
+
+        /**
+         * Fisher-Yates (Knuth) shuffle algorithm.
+         * @param {Array} array - The array to shuffle.
+         */
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]]; // Swap elements
+            }
+        }
+
+        /**
+         * Handles user login.
+         */
+        function handleLogin() {
+            const username = usernameInput.value;
+            const password = passwordInput.value;
+
+            if (USERS[username] === password) {
+                loginContainer.classList.remove('block');
+                loginContainer.classList.add('hidden');
+                testContainer.classList.remove('hidden');
+                testContainer.classList.add('block');
+                displayQuestions();
+            } else {
+                loginError.classList.remove('hidden');
+            }
+        }
+
+        /**
+         * Dynamically renders all questions and their options into the test container.
+         */
+        function displayQuestions() {
+            questionsArea.innerHTML = ''; // Clear previous questions
+
+            // Shuffle the questions array
+            shuffleArray(questions);
+
+            questions.forEach((q, index) => {
+                // Shuffle options for each question
+                shuffleArray(q.options);
+
+                const questionBlock = document.createElement('div');
+                questionBlock.className = 'question-block';
+                questionBlock.innerHTML = `
+                    <p class="text-lg font-semibold text-gray-800 mb-4">${index + 1}. ${q.scenario}</p>
+                    <div class="options-container">
+                        ${q.options.map((option, optIndex) => `
+                            <label class="option-label">
+                                <input type="radio" name="${q.id}" value="${optIndex}" class="mr-3">
+                                <span class="text-gray-700">${option.text}</span>
+                            </label>
+                        `).join('')}
+                    </div>
+                `;
+                questionsArea.appendChild(questionBlock);
+            });
+        }
+
+        /**
+         * Calculates the total score and competency-specific scores, then displays the scorecard.
+         */
+        function calculateScore() {
+            let totalScore = 0;
+            let allAnswered = true;
+            const competencyScores = {};
+            const maxCompetencyScores = {}; // Max possible score for each competency
+
+            // Initialize competency scores
+            COMPETENCIES.forEach(comp => {
+                competencyScores[comp.id] = 0;
+                maxCompetencyScores[comp.id] = 0;
+            });
+
+            questions.forEach(q => {
+                const selectedOption = document.querySelector(`input[name="${q.id}"]:checked`);
+                if (selectedOption) {
+                    const optionIndex = parseInt(selectedOption.value);
+                    const score = q.options[optionIndex].score;
+                    totalScore += score;
+                    competencyScores[q.competency] += score;
+                } else {
+                    allAnswered = false; // A question was not answered
+                }
+                // Calculate max possible score for each competency (each question contributes 1 max point)
+                maxCompetencyScores[q.competency] += 1;
+            });
+
+            if (!allAnswered) {
+                testErrorMessage.classList.remove('hidden');
+                return; // Stop execution if not all questions are answered
+            } else {
+                testErrorMessage.classList.add('hidden');
+            }
+
+            const maxOverallScore = questions.length; // Total questions = 20
+            const percentageScore = (totalScore / maxOverallScore * 100).toFixed(2);
+
+            finalScoreSpan.textContent = totalScore.toFixed(2);
+            percentageScoreSpan.textContent = percentageScore;
+            updateOverallMessage(percentageScore);
+            displayCompetencyScores(competencyScores, maxCompetencyScores);
+            renderCharts(competencyScores, maxCompetencyScores);
+
+            testContainer.classList.remove('block');
+            testContainer.classList.add('hidden');
+            scorecard.classList.remove('hidden');
+            scorecard.classList.add('block');
+        }
+
+        /**
+         * Updates the overall message based on the total percentage score.
+         * @param {number} percentage - The overall percentage score.
+         */
+        function updateOverallMessage(percentage) {
+            let message = '';
+            let messageClass = '';
+            if (percentage >= 90) {
+                message = "Outstanding performance! You demonstrate exceptional leadership competencies and a deep understanding of effective people management.";
+                messageClass = "text-green-700";
+            } else if (percentage >= 70) {
+                message = "Great job! You have a strong grasp of key leadership principles. Continue to refine your skills.";
+                messageClass = "text-green-600";
+            } else if (percentage >= 50) {
+                message = "Good effort. You understand the basics of people leadership, but there are areas for growth and development.";
+                messageClass = "text-yellow-700";
+            } else {
+                message = "Keep learning! This test highlights opportunities to develop your leadership competencies further. Review the best practices for each scenario.";
+                messageClass = "text-red-700";
+            }
+            overallMessage.textContent = message;
+            overallMessage.className = `text-center text-lg font-semibold mb-8 ${messageClass}`;
+        }
+
+        /**
+         * Displays individual competency scores in card format.
+         * @param {object} scores - Object with scores per competency.
+         * @param {object} maxScores - Object with max possible scores per competency.
+         */
+        function displayCompetencyScores(scores, maxScores) {
+            competencyScoresDiv.innerHTML = '';
+            COMPETENCIES.forEach(comp => {
+                const score = scores[comp.id];
+                const maxScore = maxScores[comp.id];
+                // Calculate percentage for each competency
+                const percentage = (maxScore > 0) ? (score / maxScore * 100).toFixed(0) : 0;
+                const card = document.createElement('div');
+                card.className = 'score-card-item';
+                card.innerHTML = `
+                    ${comp.initials}: ${score.toFixed(2)} / ${maxScore.toFixed(0)} (${percentage}%)
+                `;
+                competencyScoresDiv.appendChild(card);
+            });
+        }
+
+        /**
+         * Renders the bar chart and pie chart using Chart.js.
+         * @param {object} scores - Object with scores per competency.
+         * @param {object} maxScores - Object with max possible scores per competency.
+         */
+        function renderCharts(scores, maxScores) {
+            // Use initials for chart labels
+            const labels = COMPETENCIES.map(comp => comp.initials);
+            const fullLabels = COMPETENCIES.map(comp => comp.name); // Full names for tooltips
+            const actualScores = COMPETENCIES.map(comp => scores[comp.id]);
+            const percentageScores = COMPETENCIES.map(comp => (maxScores[comp.id] > 0) ? (scores[comp.id] / maxScores[comp.id] * 100) : 0);
+
+            // Destroy existing charts if they exist
+            if (barChartInstance) barChartInstance.destroy();
+            if (pieChartInstance) pieChartInstance.destroy();
+
+            // Bar Chart: Competency Scores
+            const barCtx = document.getElementById('barChart').getContext('2d');
+            barChartInstance = new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Your Score',
+                        data: actualScores,
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)', /* Blue */
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Max Possible Score',
+                        data: labels.map((_, i) => maxScores[COMPETENCIES[i].id]),
+                        backgroundColor: 'rgba(209, 213, 219, 0.7)', /* Light gray */
+                        borderColor: 'rgba(209, 213, 219, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Score'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Competency'
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Score by Competency',
+                            font: { size: 18 }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    // Display the full competency name on hover for bar chart
+                                    return fullLabels[context[0].dataIndex];
+                                },
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += context.parsed.y.toFixed(2);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Pie Chart: Competency Performance %
+            const pieCtx = document.getElementById('pieChart').getContext('2d');
+            const backgroundColors = labels.map((_, i) => `hsl(${i * (360 / labels.length)}, 70%, 60%)`); /* Generate diverse colors */
+            pieChartInstance = new Chart(pieCtx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: percentageScores,
+                        backgroundColor: backgroundColors,
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Performance Percentage by Competency',
+                            font: { size: 18 }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    // Display full competency name and percentage for pie chart
+                                    let label = fullLabels[context.dataIndex] || ''; // Get full name
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed !== null) {
+                                        label += context.parsed.toFixed(1) + '%';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        /**
+         * Resets the test, clearing selections and showing login page again.
+         */
+        function resetTest() {
+            // Clear all radio button selections
+            document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
+                radio.checked = false;
+            });
+
+            // Clear login inputs
+            usernameInput.value = '';
+            passwordInput.value = '';
+            loginError.classList.add('hidden'); // Hide login error
+
+            // Hide scorecard and test, show login
+            scorecard.classList.remove('block');
+            scorecard.classList.add('hidden');
+            testContainer.classList.remove('block');
+            testContainer.classList.add('hidden');
+            loginContainer.classList.remove('hidden');
+            loginContainer.classList.add('block');
+
+            // Hide test error message
+            testErrorMessage.classList.add('hidden');
+        }
+
+        // Event Listeners
+        loginButton.addEventListener('click', handleLogin);
+        submitButton.addEventListener('click', calculateScore);
+        retakeButton.addEventListener('click', resetTest);
+
+        // Initial setup: Ensure only login is visible on load
+        document.addEventListener('DOMContentLoaded', () => {
+            loginContainer.classList.add('block'); // Ensure login is visible at start
+            testContainer.classList.add('hidden');
+            scorecard.classList.add('hidden');
+        });
+    </script>
+</body>
+</html>
